@@ -59,6 +59,14 @@ public class AdminController {
         log.info("Admin updating order {} status to: {}", id, status);
         return adminService.updateOrderStatus(id, status);
     }
+
+    //ASSIGN DELIVERY AGENT TO ORDER
+    @PutMapping("/order/{orderId}/assign-agent/{agentId}")
+    public OrderDTO assignAgentToOrder(@PathVariable Long orderId,
+                                       @PathVariable Long agentId) {
+        log.info("Admin assigning agent {} to order {}", agentId, orderId);
+        return adminService.assignAgentToOrder(orderId, agentId);
+    }
     
     @Autowired
     private AddressService addressService;

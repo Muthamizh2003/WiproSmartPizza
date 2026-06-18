@@ -2,13 +2,14 @@ import { useState, useEffect } from 'react'
 import { ClipboardList, Check, X, RefreshCw, Loader2, Truck, Filter, ChevronDown, Package } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip } from 'recharts'
 import { adminService } from '../../services/adminService'
-import { deliveryService } from '../../services/deliveryService'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { TableSkeleton } from '../../components/common/LoadingSkeleton'
+import { useToast } from '../../context/ToastContext'
 
 const PIE_COLORS = ['#d4a574', '#7f9e7f', '#c97d60', '#f59e0b', '#5c5c5c', '#dc3545']
 
 export const OrderManagement = () => {
+  const toast = useToast()
   const [orders, setOrders] = useState([])
   const [agents, setAgents] = useState([])
   const [loading, setLoading] = useState(true)
@@ -16,12 +17,13 @@ export const OrderManagement = () => {
   const [assigning, setAssigning] = useState(null)
   const [filter, setFilter] = useState('all')
   const [expandedId, setExpandedId] = useState(null)
+  const [selectedAgentIds, setSelectedAgentIds] = useState({})
 
   const loadOrders = async () => {
     try {
       const data = await adminService.getAllOrders()
       setOrders(data || [])
-    } catch { return null }
+    } catch { toast.error('Failed to load orders') }
   }
 
   useEffect(() => {
@@ -39,18 +41,21 @@ export const OrderManagement = () => {
     try {
       await adminService.updateOrderStatus(orderId, status)
       setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o))
-    } catch { return null }
+      toast.success(`Order #${orderId} updated to ${status.replace(/_/g, ' ')}`)
+    } catch { toast.error(`Failed to update order #${orderId}`) }
     finally { setUpdating(null) }
   }
 
-  const assignAgent = async (orderId) => {
+  const assignAgent = async (orderId, agentId) => {
+    if (!agentId) { toast.error('Please select a delivery agent'); return }
     setAssigning(orderId)
     try {
-      await deliveryService.start(orderId)
-      // Reload orders to get updated delivery agent info
+      await adminService.assignAgentToOrder(orderId, agentId)
       const data = await adminService.getAllOrders()
       setOrders(data || [])
-    } catch { return null }
+      setSelectedAgentIds(prev => ({ ...prev, [orderId]: undefined }))
+      toast.success(`Agent assigned to order #${orderId}`)
+    } catch { toast.error(`Failed to assign agent to order #${orderId}`) }
     finally { setAssigning(null) }
   }
 
@@ -251,9 +256,30 @@ export const OrderManagement = () => {
 
                     {/* Assign Delivery Agent */}
                     {canAssign && (
-                      <button onClick={() => assignAgent(order.id)} disabled={assigning === order.id} className="btn btn-sm btn-outline-secondary" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-                        {assigning === order.id ? <Loader2 size={12} style={{ animation: 'spin 1s linear infinite' }} /> : <Truck size={12} />} Assign Agent
-                      </button>
+                      <div style={{ display: 'flex', gap: '0.25rem', alignItems: 'center' }}>
+                        <select
+                          value={selectedAgentIds[order.id] || ''}
+                          onChange={(e) => setSelectedAgentIds(prev => ({ ...prev, [order.id]: e.target.value ? Number(e.target.value) : undefined }))}
+                          style={{
+                            fontSize: '0.72rem', padding: '0.2rem 0.3rem',
+                            borderRadius: 'var(--radius-sm)', border: '1px solid var(--sp-border)',
+                            background: 'var(--sp-warm-gray-light)', maxWidth: '130px'
+                          }}
+                        >
+                          <option value="">Select agent...</option>
+                          {agents.filter(a => a.available).map(a => (
+                            <option key={a.id} value={a.id}>{a.name}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => assignAgent(order.id, selectedAgentIds[order.id])}
+                          disabled={assigning === order.id || !selectedAgentIds[order.id]}
+                          className="btn btn-sm btn-outline-secondary"
+                          style={{ fontSize: '0.72rem', padding: '0.2rem 0.4rem', display: 'flex', alignItems: 'center', gap: '0.2rem' }}
+                        >
+                          {assigning === order.id ? <Loader2 size={10} style={{ animation: 'spin 1s linear infinite' }} /> : <Truck size={10} />} Assign
+                        </button>
+                      </div>
                     )}
                   </div>
                 </div>

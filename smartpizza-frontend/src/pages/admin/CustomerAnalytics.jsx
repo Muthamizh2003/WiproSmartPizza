@@ -4,10 +4,12 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { adminService } from '../../services/adminService'
 import { formatCurrency, formatDate } from '../../utils/formatters'
 import { StatsSkeleton, TableSkeleton } from '../../components/common/LoadingSkeleton'
+import { useToast } from '../../context/ToastContext'
 
 const PIE_COLORS = ['#c97d60', '#7f9e7f', '#d4a574', '#5c5c5c', '#e8c170']
 
 export const CustomerAnalytics = () => {
+  const toast = useToast()
   const [topCustomers, setTopCustomers] = useState([])
   const [trends, setTrends] = useState([])
   const [allUsers, setAllUsers] = useState([])
@@ -38,7 +40,8 @@ export const CustomerAnalytics = () => {
     try {
       await adminService.blockUser(userId)
       setAllUsers(prev => prev.map(u => u.id === userId ? { ...u, blocked: !u.blocked } : u))
-    } catch { return null }
+      toast.success('User updated')
+    } catch { toast.error('Failed to update user') }
   }
 
   const handleDelete = async (userId) => {
@@ -46,7 +49,8 @@ export const CustomerAnalytics = () => {
     try {
       await adminService.deleteUser(userId)
       setAllUsers(prev => prev.filter(u => u.id !== userId))
-    } catch { return null }
+      toast.success('User deleted')
+    } catch { toast.error('Failed to delete user') }
   }
 
   if (loading) return <StatsSkeleton />

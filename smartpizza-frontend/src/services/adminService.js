@@ -18,6 +18,8 @@ export const adminService = {
   getAllOrders: () => api.get('/admin/orders/all').then(r => r.data),
   updateOrderStatus: (id, status) =>
     api.put(`/admin/order/${id}`, null, { params: { status } }).then(r => r.data),
+  assignAgentToOrder: (orderId, agentId) =>
+    api.put(`/admin/order/${orderId}/assign-agent/${agentId}`).then(r => r.data),
 
   // Products
   updateProduct: (id, data) => api.put(`/admin/product/${id}`, data).then(r => r.data),

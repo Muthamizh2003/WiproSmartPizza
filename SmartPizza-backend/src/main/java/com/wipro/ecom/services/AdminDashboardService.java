@@ -37,6 +37,8 @@ public interface AdminDashboardService {
 
     OrderDTO updateOrderStatus(Long orderId, String status);
 
+    OrderDTO assignAgentToOrder(Long orderId, Long agentId);
+
     List<OrderDTO> getAllOrders();
 
     List<DailyOrderDTO> getDailyOrderCounts();

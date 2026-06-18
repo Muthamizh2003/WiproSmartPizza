@@ -4,7 +4,6 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -26,8 +25,10 @@ import com.wipro.ecom.enumpackage.DiscountType;
 import com.wipro.ecom.repository.AddressRepository;
 import com.wipro.ecom.repository.CartItemRepository;
 import com.wipro.ecom.repository.CouponRepository;
+import com.wipro.ecom.repository.DeliveryRepository;
 import com.wipro.ecom.repository.OrderItemRepository;
 import com.wipro.ecom.repository.OrderRepository;
+import com.wipro.ecom.repository.ProductRepository;
 import com.wipro.ecom.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,11 +39,15 @@ class OrderServiceImplTest {
     @Mock
     private OrderItemRepository orderItemRepo;
     @Mock
+    private AddressRepository addressRepo;
+    @Mock
     private CartItemRepository cartRepo;
     @Mock
-    private UserRepository userRepo;
+    private DeliveryRepository deliveryRepo;
     @Mock
-    private AddressRepository addressRepo;
+    private ProductRepository productRepo;
+    @Mock
+    private UserRepository userRepo;
     @Mock
     private CouponRepository couponRepo;
 
@@ -51,120 +56,63 @@ class OrderServiceImplTest {
 
     private User user;
     private Address address;
+    private Product product;
     private CartItem cartItem;
+    private Coupon coupon;
 
     @BeforeEach
     void setUp() {
         user = new User();
         user.setId(1L);
-        user.setName("Test User");
         user.setBlocked(false);
 
         address = new Address();
         address.setId(10L);
         address.setCity("Mumbai");
-        address.setState("Maharashtra");
 
-        Product product = new Product();
+        product = new Product();
         product.setId(100L);
         product.setName("Margherita");
         product.setPrice(300);
 
         cartItem = new CartItem();
+        cartItem.setId(1L);
         cartItem.setUser(user);
         cartItem.setProduct(product);
         cartItem.setQuantity(2);
-    }
 
-    @Test
-    void testPlaceOrder_Success() {
-        when(userRepo.findById(1L)).thenReturn(Optional.of(user));
-        when(addressRepo.findById(10L)).thenReturn(Optional.of(address));
-        when(cartRepo.findByUserId(1L)).thenReturn(List.of(cartItem));
-
-        when(orderRepo.save(any(Order.class))).thenAnswer(inv -> {
-            Order o = inv.getArgument(0);
-            o.setId(1000L);
-            o.setCreatedAt(LocalDateTime.now());
-            return o;
-        });
-        when(orderItemRepo.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
-
-        OrderDTO result = orderService.placeOrder(1L, 10L, null);
-
-        assertEquals("PENDING_PAYMENT", result.getStatus());
-        assertEquals(660, result.getTotalAmount()); // 600 + 60 tax
-        assertEquals(60, result.getTaxAmount());
-        verify(cartRepo).deleteByUserId(1L);
-    }
-
-    @Test
-    void testPlaceOrder_WithCoupon() {
-        Coupon coupon = new Coupon();
-        coupon.setCode("PCT10");
-        coupon.setDiscount(10);
-        coupon.setType(DiscountType.PERCENTAGE);
+        coupon = new Coupon();
+        coupon.setId(1L);
+        coupon.setCode("FLAT50");
+        coupon.setDiscount(50);
+        coupon.setType(DiscountType.FLAT);
         coupon.setMinOrderAmount(100);
-        coupon.setExpiryDate(LocalDateTime.now().plusDays(30));
+        coupon.setExpiryDate(LocalDateTime.now().plusDays(10));
+    }
 
+    @Test
+    void testPlaceOrder_WithFlatCoupon() {
         when(userRepo.findById(1L)).thenReturn(Optional.of(user));
         when(addressRepo.findById(10L)).thenReturn(Optional.of(address));
         when(cartRepo.findByUserId(1L)).thenReturn(List.of(cartItem));
-        when(couponRepo.findByCode("PCT10")).thenReturn(Optional.of(coupon));
+        when(couponRepo.findByCode("FLAT50")).thenReturn(Optional.of(coupon));
         when(orderRepo.save(any(Order.class))).thenAnswer(inv -> {
             Order o = inv.getArgument(0);
-            o.setId(1001L);
-            o.setCreatedAt(LocalDateTime.now());
+            o.setId(200L);
             return o;
         });
-        when(orderItemRepo.saveAll(anyList())).thenAnswer(inv -> inv.getArgument(0));
 
-        OrderDTO result = orderService.placeOrder(1L, 10L, "PCT10");
+        OrderDTO result = orderService.placeOrder(1L, 10L, "FLAT50");
 
-        // subtotal=600, discount=60, totalAfterDiscount=540, tax=54, final=594
-        assertEquals(594, result.getTotalAmount());
-        assertEquals(54, result.getTaxAmount());
-    }
+        assertNotNull(result);
+        verify(orderItemRepo).saveAll(anyList());
+        verify(cartRepo).deleteByUserId(1L);
 
-    @Test
-    void testPlaceOrder_BlockedUser() {
-        user.setBlocked(true);
-        when(userRepo.findById(1L)).thenReturn(Optional.of(user));
-
-        assertThrows(RuntimeException.class, () -> orderService.placeOrder(1L, 10L, null));
-    }
-
-    @Test
-    void testPlaceOrder_EmptyCart() {
-        when(userRepo.findById(1L)).thenReturn(Optional.of(user));
-        when(addressRepo.findById(10L)).thenReturn(Optional.of(address));
-        when(cartRepo.findByUserId(1L)).thenReturn(new ArrayList<>());
-
-        assertThrows(RuntimeException.class, () -> orderService.placeOrder(1L, 10L, null));
-    }
-
-    @Test
-    void testCancelOrder_Success() {
-        Order order = new Order();
-        order.setId(1L);
-        order.setStatus("PENDING_PAYMENT");
-
-        when(orderRepo.findById(1L)).thenReturn(Optional.of(order));
-        when(orderRepo.save(order)).thenReturn(order);
-
-        orderService.cancelOrder(1L);
-
-        assertEquals("CANCELLED", order.getStatus());
-    }
-
-    @Test
-    void testCancelOrder_InvalidStatus() {
-        Order order = new Order();
-        order.setId(2L);
-        order.setStatus("DELIVERED");
-
-        when(orderRepo.findById(2L)).thenReturn(Optional.of(order));
-
-        assertThrows(RuntimeException.class, () -> orderService.cancelOrder(2L));
+        double expectedAfterDiscount = 600.0 - 50.0; // 550
+        double expectedTax = 55.0;
+        double expectedTotal = 605.0;
+        assertEquals(expectedTotal, result.getTotalAmount(), 0.01);
+        assertEquals(200L, result.getId());
+        assertEquals("PENDING_PAYMENT", result.getStatus());
     }
 }

@@ -70,6 +70,9 @@ public class DeliveryServiceImpl implements DeliveryService {
 		agentRepo.save(agent);
 
        
+        order.setStatus("OUT_FOR_DELIVERY");
+        orderRepo.save(order);
+
         Delivery delivery = new Delivery();
         delivery.setOrder(order);
         delivery.setAgent(agent);

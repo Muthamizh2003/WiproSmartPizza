@@ -29,7 +29,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("SELECT o.status, COUNT(o) FROM Order o GROUP BY o.status")
     List<Object[]> getOrderStatusCount();
 
-    @Query("SELECT o.user.id, COUNT(o) FROM Order o GROUP BY o.user.id ORDER BY COUNT(o) DESC")
+    @Query("SELECT o.user.id, o.user.name, o.user.email, COUNT(o), SUM(o.totalAmount) FROM Order o GROUP BY o.user.id, o.user.name, o.user.email ORDER BY COUNT(o) DESC")
     List<Object[]> getTopCustomers();
     
     @Query("""

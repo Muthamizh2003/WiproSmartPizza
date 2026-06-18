@@ -1,10 +1,12 @@
 package com.wipro.ecom.serviceimpl;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
+import com.wipro.ecom.dtos.AddressDTO;
 import com.wipro.ecom.dtos.CustomerAnalyticsDTO;
 import com.wipro.ecom.dtos.CustomerTrendDTO;
 import com.wipro.ecom.dtos.DailyOrderDTO;
@@ -13,12 +15,15 @@ import com.wipro.ecom.dtos.DeliveryPerformanceDTO;
 import com.wipro.ecom.dtos.HeatmapDTO;
 import com.wipro.ecom.dtos.OrderAnalyticsDTO;
 import com.wipro.ecom.dtos.OrderDTO;
+import com.wipro.ecom.dtos.OrderItemDTO;
 import com.wipro.ecom.dtos.ProductDTO;
 import com.wipro.ecom.dtos.RevenueDTO;
 import com.wipro.ecom.entities.Delivery;
+import com.wipro.ecom.entities.DeliveryAgent;
 import com.wipro.ecom.entities.Order;
 import com.wipro.ecom.entities.Product;
 import com.wipro.ecom.entities.User;
+import com.wipro.ecom.repository.DeliveryAgentRepository;
 import com.wipro.ecom.repository.DeliveryRepository;
 import com.wipro.ecom.repository.OrderRepository;
 import com.wipro.ecom.repository.PaymentRepository;
@@ -46,7 +51,13 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 	@Autowired
 	private PaymentRepository paymentRepo;
 	
+	@Autowired
+	private DeliveryAgentRepository agentRepo;
+	
 	private static final Logger log = LoggerFactory.getLogger(AdminDashboardServiceImpl.class);
+	
+	private static final double SHOP_LAT = 13.0827;
+	private static final double SHOP_LNG = 80.2707;
 	
     //REVENUE
     @Override
@@ -185,11 +196,11 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
          User user = userRepo.findById(userId)
                  .orElseThrow(() -> new RuntimeException("User not found"));
 
-         user.setBlocked(true); //make sure field exists
+          user.setBlocked(!user.isBlocked());
 
-         userRepo.save(user);
+          userRepo.save(user);
 
-         return "User blocked successfully";
+          return user.isBlocked() ? "User blocked successfully" : "User unblocked successfully";
      }
 
      //UPDATE ORDER STATUS
@@ -215,8 +226,43 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
          return mapOrderToDTO(order);
      }
 
-    @Override
-    public List<DailyOrderDTO> getDailyOrderCounts() {
+     //ASSIGN DELIVERY AGENT TO ORDER
+     @Override
+     public OrderDTO assignAgentToOrder(Long orderId, Long agentId) {
+
+         Order order = orderRepo.findById(orderId)
+                 .orElseThrow(() -> new RuntimeException("Order not found"));
+
+         DeliveryAgent agent = agentRepo.findById(agentId)
+                 .orElseThrow(() -> new RuntimeException("Delivery agent not found"));
+
+         if (!agent.isAvailable()) {
+             throw new RuntimeException("Delivery agent is not available");
+         }
+
+         if (deliveryRepo.findByOrderId(orderId).isPresent()) {
+             throw new RuntimeException("Delivery already started for this order");
+         }
+
+         agent.setAvailable(false);
+         agentRepo.save(agent);
+
+         order.setStatus("OUT_FOR_DELIVERY");
+         orderRepo.save(order);
+
+         Delivery delivery = new Delivery();
+         delivery.setOrder(order);
+         delivery.setAgent(agent);
+         delivery.setStatus("OUT_FOR_DELIVERY");
+         delivery.setLatitude(SHOP_LAT);
+         delivery.setLongitude(SHOP_LNG);
+         deliveryRepo.save(delivery);
+
+         return mapOrderToDTO(order);
+     }
+
+     @Override
+     public List<DailyOrderDTO> getDailyOrderCounts() {
         List<Object[]> data = orderRepo.getDailyOrderCounts();
         return data.stream().map(obj -> {
             DailyOrderDTO dto = new DailyOrderDTO();
@@ -231,7 +277,6 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
          List<Order> orders = orderRepo.findAll();
          return orders.stream().map(order -> {
              OrderDTO dto = mapOrderToDTO(order);
-             dto.setUserName(order.getUser().getName());
              Delivery delivery = deliveryRepo.findByOrderId(order.getId()).orElse(null);
              if (delivery != null) {
                  dto.setDeliveryAgentName(delivery.getAgent() != null ? delivery.getAgent().getName() : null);
@@ -260,10 +305,35 @@ public class AdminDashboardServiceImpl implements AdminDashboardService {
 
          dto.setId(o.getId());
          dto.setUserId(o.getUser().getId());
+         dto.setUserName(o.getUser().getName());
          dto.setTotalAmount(o.getTotalAmount());
          dto.setTaxAmount(o.getTaxAmount());
          dto.setStatus(o.getStatus());
          dto.setCreatedAt(o.getCreatedAt());
+
+         if (o.getDeliveryAddress() != null) {
+             AddressDTO addr = new AddressDTO();
+             addr.setId(o.getDeliveryAddress().getId());
+             addr.setStreet(o.getDeliveryAddress().getStreet());
+             addr.setCity(o.getDeliveryAddress().getCity());
+             addr.setState(o.getDeliveryAddress().getState());
+             addr.setPincode(o.getDeliveryAddress().getPincode());
+             addr.setLandmark(o.getDeliveryAddress().getLandmark());
+             addr.setLatitude(o.getDeliveryAddress().getLatitude());
+             addr.setLongitude(o.getDeliveryAddress().getLongitude());
+             dto.setDeliveryAddress(addr);
+         }
+
+         if (o.getItems() != null) {
+             dto.setItems(o.getItems().stream().map(item -> {
+                 OrderItemDTO itemDTO = new OrderItemDTO();
+                 itemDTO.setProductId(item.getProduct().getId());
+                 itemDTO.setProductName(item.getProduct().getName());
+                 itemDTO.setQuantity(item.getQuantity());
+                 itemDTO.setPrice(item.getPrice());
+                 return itemDTO;
+             }).collect(Collectors.toList()));
+         }
 
          return dto;
      }
