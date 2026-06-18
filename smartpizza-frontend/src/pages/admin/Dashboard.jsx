@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { LayoutDashboard, TrendingUp, ClipboardList, Truck, Users, DollarSign, Bike, Calendar, RefreshCw, Pizza } from 'lucide-react'
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar } from 'recharts'
 import { adminService } from '../../services/adminService'
 import { formatCurrency } from '../../utils/formatters'
 import { StatsSkeleton } from '../../components/common/LoadingSkeleton'
@@ -53,6 +54,13 @@ export const Dashboard = () => {
     { label: 'Delivered', value: delivered, icon: Truck, color: 'var(--sp-sage)' }
   ]
 
+  // Status counts for pie chart
+  const statusCounts = orders?.statusCounts || []
+  const statusData = statusCounts.map(([status, count]) => ({
+    name: status?.replace(/_/g, ' '),
+    count
+  }))
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -83,6 +91,7 @@ export const Dashboard = () => {
         ))}
       </div>
 
+      {/* Daily Orders Line Chart + Heatmap */}
       <div className="card">
         <div className="card-body">
           <h5 style={{ fontFamily: 'var(--font-display)', fontSize: '1.15rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
@@ -100,25 +109,54 @@ export const Dashboard = () => {
               </div>
             ))}
           </div>
+
+          {/* Line Chart for Daily Orders */}
+          {dailyOrders.length > 0 && (
+            <div style={{ marginBottom: '1rem' }}>
+              <h6 style={{ fontSize: '0.88rem', fontWeight: 600, marginBottom: '0.5rem', color: 'var(--sp-text-muted)' }}>Orders Over Time</h6>
+              <ResponsiveContainer width="100%" height={200}>
+                <LineChart data={dailyOrders}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--sp-border)" />
+                  <XAxis dataKey="date" tick={{ fill: 'var(--sp-text-muted)', fontSize: 10 }} />
+                  <YAxis tick={{ fill: 'var(--sp-text-muted)', fontSize: 12 }} />
+                  <Tooltip />
+                  <Line type="monotone" dataKey="count" stroke="var(--sp-sienna)" strokeWidth={2} dot={{ fill: 'var(--sp-sienna)', r: 3 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
           <OrderHeatmap data={dailyOrders} />
         </div>
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.25rem' }}>
+        {/* Order Status Bar Chart */}
         <div className="card">
           <div className="card-body">
             <h5 style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
               Order Status
             </h5>
-            {orders?.statusCounts ? (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-                {orders.statusCounts.map(([status, count], i) => (
-                  <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.55rem 0.75rem', borderRadius: 'var(--radius-sm)', background: 'var(--sp-warm-gray-light)' }}>
-                    <span style={{ fontSize: '0.85rem', fontWeight: 500 }}>{status?.replace(/_/g, ' ')}</span>
-                    <span className="badge bg-secondary">{count}</span>
-                  </div>
-                ))}
-              </div>
+            {statusData.length > 0 ? (
+              <>
+                <ResponsiveContainer width="100%" height={200}>
+                  <BarChart data={statusData}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--sp-border)" />
+                    <XAxis dataKey="name" tick={{ fill: 'var(--sp-text-muted)', fontSize: 10 }} />
+                    <YAxis tick={{ fill: 'var(--sp-text-muted)', fontSize: 12 }} />
+                    <Tooltip />
+                    <Bar dataKey="count" fill="var(--sp-sienna)" radius={[6, 6, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.3rem', marginTop: '0.75rem' }}>
+                  {statusCounts.map(([status, count], i) => (
+                    <div key={i} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '0.4rem 0.6rem', borderRadius: 'var(--radius-sm)', background: 'var(--sp-warm-gray-light)' }}>
+                      <span style={{ fontSize: '0.82rem', fontWeight: 500 }}>{status?.replace(/_/g, ' ')}</span>
+                      <span className="badge bg-secondary">{count}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
             ) : <p style={{ color: 'var(--sp-text-muted)', fontSize: '0.85rem' }}>No order data</p>}
           </div>
         </div>
@@ -130,7 +168,8 @@ export const Dashboard = () => {
                 { to: '/admin/revenue', icon: TrendingUp, label: 'Revenue Analytics' },
                 { to: '/admin/orders', icon: ClipboardList, label: 'Order Management' },
                 { to: '/admin/menu', icon: Pizza, label: 'Menu Management' },
-                { to: '/admin/customers', icon: Users, label: 'Customer Analytics' }
+                { to: '/admin/customers', icon: Users, label: 'Customer Analytics' },
+                { to: '/admin/delivery', icon: Truck, label: 'Delivery Performance' }
               ].map(l => (
                 <Link key={l.to} to={l.to} className="btn btn-outline-secondary" style={{ justifyContent: 'flex-start', gap: '0.5rem' }}>
                   <l.icon size={16} /> {l.label}
