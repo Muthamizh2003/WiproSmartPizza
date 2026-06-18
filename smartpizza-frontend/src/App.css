@@ -1,0 +1,13 @@
+.hero-counter {
+  font-size: 16px;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  color: var(--sp-sienna);
+  background: var(--sp-sienna-light);
+  border: 2px solid transparent;
+  transition: border-color 0.3s;
+}
+
+.hero-counter:hover {
+  border-color: var(--sp-sienna);
+}
