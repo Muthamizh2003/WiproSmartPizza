@@ -10,16 +10,16 @@ export const MenuManagement = () => {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ name: '', description: '', price: '', category: 'VEG', spiceLevel: 'MILD', image: '' })
+  const [form, setForm] = useState({ name: '', description: '', price: '', size: '', categoryName: '' })
 
   useEffect(() => {
     setLoading(true)
     productService.getAll().then(setProducts).finally(() => setLoading(false))
   }, [])
 
-  const resetForm = () => setForm({ name: '', description: '', price: '', category: 'VEG', spiceLevel: 'MILD', image: '' })
+  const resetForm = () => setForm({ name: '', description: '', price: '', size: '', categoryName: '' })
 
-  const startEdit = (p) => { setEditingId(p.id); setAdding(false); setForm({ name: p.name || '', description: p.description || '', price: p.price || '', category: p.category || 'VEG', spiceLevel: p.spiceLevel || 'MILD', image: p.image || '' }) }
+  const startEdit = (p) => { setEditingId(p.id); setAdding(false); setForm({ name: p.name || '', description: p.description || '', price: p.price || '', size: p.size || '', categoryName: p.categoryName || '' }) }
   const startAdd = () => { setAdding(true); setEditingId(null); resetForm() }
   const cancel = () => { setEditingId(null); setAdding(false); resetForm() }
 
@@ -27,11 +27,12 @@ export const MenuManagement = () => {
     if (!form.name.trim() || !form.price) return
     setSaving(true)
     try {
+      const payload = { ...form, price: Number(form.price) }
       if (editingId) {
-        await productService.update(editingId, { ...form, price: Number(form.price) })
-        setProducts(prev => prev.map(p => p.id === editingId ? { ...p, ...form, price: Number(form.price) } : p))
+        await productService.update(editingId, payload)
+        setProducts(prev => prev.map(p => p.id === editingId ? { ...p, ...payload } : p))
       } else {
-        const saved = await productService.create({ ...form, price: Number(form.price) })
+        const saved = await productService.add(payload)
         setProducts(prev => [...prev, saved])
       }
       cancel()
@@ -41,7 +42,7 @@ export const MenuManagement = () => {
 
   const deleteProduct = async (id) => {
     if (!window.confirm('Delete this product?')) return
-    try { await productService.delete(id); setProducts(prev => prev.filter(p => p.id !== id)) } catch { /* empty */ }
+    try { await productService.delete(id); setProducts(prev => prev.filter(p => p.id !== id)) } catch { return null }
   }
 
   if (loading) return <TableSkeleton />
@@ -73,19 +74,20 @@ export const MenuManagement = () => {
               <input type="number" className="form-control" value={form.price} onChange={e => setForm({...form, price: e.target.value})} step="0.01" />
             </div>
             <div>
-              <label className="form-label">Category</label>
-              <select className="form-select" value={form.category} onChange={e => setForm({...form, category: e.target.value})}>
-                <option value="VEG">Veg</option><option value="NON_VEG">Non-Veg</option>
+              <label className="form-label">Size *</label>
+              <select className="form-select" value={form.size} onChange={e => setForm({...form, size: e.target.value})}>
+                <option value="">Select size</option>
+                <option value="SMALL">Small</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="LARGE">Large</option>
               </select>
             </div>
             <div>
-              <label className="form-label">Spice Level</label>
-              <select className="form-select" value={form.spiceLevel} onChange={e => setForm({...form, spiceLevel: e.target.value})}>
-                <option value="MILD">Mild</option><option value="MEDIUM">Medium</option><option value="SPICY">Spicy</option>
-              </select>
+              <label className="form-label">Category *</label>
+              <input type="text" className="form-control" value={form.categoryName} onChange={e => setForm({...form, categoryName: e.target.value})} placeholder="e.g. Veg, Non-Veg" />
             </div>
             <div style={{ gridColumn: '1 / -1' }}>
-              <label className="form-label">Description</label>
+              <label className="form-label">Description *</label>
               <input type="text" className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} />
             </div>
           </div>
@@ -101,10 +103,9 @@ export const MenuManagement = () => {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: '0.85rem' }}>
         {products.map(p => (
           <div key={p.id} className="card" style={{ padding: '1rem' }}>
-            {p.image && <img src={p.image} alt={p.name} style={{ width: '100%', height: 140, objectFit: 'cover', borderRadius: 'var(--radius-md)', marginBottom: '0.75rem' }} />}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.35rem' }}>
-              <span style={{ padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 600, background: p.category === 'VEG' ? 'var(--sp-sage)' : '#dc3545', color: '#fff' }}>
-                {p.category === 'VEG' ? 'VEG' : 'NON-VEG'}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
+              <span style={{ padding: '0.15rem 0.5rem', borderRadius: 'var(--radius-full)', fontSize: '0.7rem', fontWeight: 600, background: 'var(--sp-sage)', color: '#fff' }}>
+                {p.categoryName || 'N/A'}
               </span>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 <button onClick={() => startEdit(p)} className="btn btn-sm btn-outline-secondary" style={{ padding: '0.25rem 0.5rem' }}><Pencil size={12} /></button>
@@ -115,7 +116,7 @@ export const MenuManagement = () => {
             <p style={{ fontSize: '0.82rem', color: 'var(--sp-text-muted)', margin: '0.25rem 0' }}>{p.description}</p>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: '0.5rem' }}>
               <span style={{ fontWeight: 700, color: 'var(--sp-sage)' }}>{formatCurrency(p.price)}</span>
-              <small style={{ color: 'var(--sp-text-muted)' }}>{p.spiceLevel}</small>
+              <small style={{ color: 'var(--sp-text-muted)' }}>{p.size}</small>
             </div>
           </div>
         ))}

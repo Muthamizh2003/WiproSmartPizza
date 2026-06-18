@@ -10,24 +10,24 @@ export const CouponManagement = () => {
   const [editingId, setEditingId] = useState(null)
   const [adding, setAdding] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ code: '', description: '', discountType: 'PERCENTAGE', discountValue: '', minOrderValue: '', maxDiscount: '', expiryDate: '', active: true })
+  const [form, setForm] = useState({ code: '', discount: '', type: 'PERCENTAGE', minOrderAmount: '', expiryDate: '' })
 
   useEffect(() => {
     setLoading(true)
     couponService.getAll().then(setCoupons).finally(() => setLoading(false))
   }, [])
 
-  const resetForm = () => setForm({ code: '', description: '', discountType: 'PERCENTAGE', discountValue: '', minOrderValue: '', maxDiscount: '', expiryDate: '', active: true })
+  const resetForm = () => setForm({ code: '', discount: '', type: 'PERCENTAGE', minOrderAmount: '', expiryDate: '' })
 
-  const startEdit = (c) => { setEditingId(c.id); setAdding(false); setForm({ code: c.code || '', description: c.description || '', discountType: c.discountType || 'PERCENTAGE', discountValue: c.discountValue || '', minOrderValue: c.minOrderValue || '', maxDiscount: c.maxDiscount || '', expiryDate: c.expiryDate?.slice(0,10) || '', active: c.active ?? true }) }
+  const startEdit = (c) => { setEditingId(c.id); setAdding(false); setForm({ code: c.code || '', discount: c.discount || '', type: c.type || 'PERCENTAGE', minOrderAmount: c.minOrderAmount || '', expiryDate: c.expiryDate?.slice(0,10) || '' }) }
   const startAdd = () => { setAdding(true); setEditingId(null); resetForm() }
   const cancel = () => { setEditingId(null); setAdding(false); resetForm() }
 
   const handleSave = async () => {
-    if (!form.code.trim() || !form.discountValue) return
+    if (!form.code.trim() || !form.discount) return
     setSaving(true)
     try {
-      const payload = { ...form, discountValue: Number(form.discountValue), minOrderValue: form.minOrderValue ? Number(form.minOrderValue) : null, maxDiscount: form.maxDiscount ? Number(form.maxDiscount) : null }
+      const payload = { ...form, discount: Number(form.discount), minOrderAmount: form.minOrderAmount ? Number(form.minOrderAmount) : null }
       if (editingId) {
         await couponService.update(editingId, payload)
         setCoupons(prev => prev.map(c => c.id === editingId ? { ...c, ...payload } : c))
@@ -42,7 +42,7 @@ export const CouponManagement = () => {
 
   const deleteCoupon = async (id) => {
     if (!window.confirm('Delete this coupon?')) return
-    try { await couponService.delete(id); setCoupons(prev => prev.filter(c => c.id !== id)) } catch { /* empty */ }
+    try { await couponService.delete(id); setCoupons(prev => prev.filter(c => c.id !== id)) } catch { return null }
   }
 
   if (loading) return <TableSkeleton />
@@ -66,19 +66,17 @@ export const CouponManagement = () => {
           <h5 style={{ fontFamily: 'var(--font-display)', fontSize: '1.05rem', marginBottom: '1rem' }}>{editingId ? 'Edit Coupon' : 'Add Coupon'}</h5>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem' }}>
             <div><label className="form-label">Code *</label><input type="text" className="form-control" value={form.code} onChange={e => setForm({...form, code: e.target.value.toUpperCase()})} /></div>
-            <div><label className="form-label">Discount Type</label>
-              <select className="form-select" value={form.discountType} onChange={e => setForm({...form, discountType: e.target.value})}>
+            <div><label className="form-label">Type</label>
+              <select className="form-select" value={form.type} onChange={e => setForm({...form, type: e.target.value})}>
                 <option value="PERCENTAGE">Percentage</option><option value="FLAT">Flat</option>
               </select></div>
-            <div><label className="form-label">Discount Value *</label><input type="number" className="form-control" value={form.discountValue} onChange={e => setForm({...form, discountValue: e.target.value})} /></div>
-            <div><label className="form-label">Min Order</label><input type="number" className="form-control" value={form.minOrderValue} onChange={e => setForm({...form, minOrderValue: e.target.value})} /></div>
-            <div><label className="form-label">Max Discount</label><input type="number" className="form-control" value={form.maxDiscount} onChange={e => setForm({...form, maxDiscount: e.target.value})} /></div>
+            <div><label className="form-label">Discount *</label><input type="number" className="form-control" value={form.discount} onChange={e => setForm({...form, discount: e.target.value})} /></div>
+            <div><label className="form-label">Min Order Amount</label><input type="number" className="form-control" value={form.minOrderAmount} onChange={e => setForm({...form, minOrderAmount: e.target.value})} /></div>
             <div><label className="form-label">Expiry</label><input type="date" className="form-control" value={form.expiryDate} onChange={e => setForm({...form, expiryDate: e.target.value})} /></div>
-            <div style={{ gridColumn: '1 / -1' }}><label className="form-label">Description</label><input type="text" className="form-control" value={form.description} onChange={e => setForm({...form, description: e.target.value})} /></div>
           </div>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.65rem', marginTop: '1rem' }}>
             <button onClick={cancel} className="btn btn-outline-secondary btn-sm">Cancel</button>
-            <button onClick={handleSave} disabled={saving || !form.code.trim() || !form.discountValue} className="btn btn-pizza btn-sm">
+            <button onClick={handleSave} disabled={saving || !form.code.trim() || !form.discount} className="btn btn-pizza btn-sm">
               {saving ? <Loader2 size={14} style={{ animation: 'spin 1s linear infinite' }} /> : <Save size={14} />} {saving ? 'Saving...' : 'Save'}
             </button>
           </div>
@@ -89,8 +87,8 @@ export const CouponManagement = () => {
         {coupons.map(c => (
           <div key={c.id} className="card" style={{ padding: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.5rem' }}>
-              <span style={{ padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: c.active ? 'var(--sp-sage)' : 'var(--sp-warm-gray)', color: c.active ? '#fff' : 'var(--sp-text-muted)', fontSize: '0.72rem', fontWeight: 600 }}>
-                {c.active ? 'ACTIVE' : 'INACTIVE'}
+              <span style={{ padding: '0.2rem 0.6rem', borderRadius: 'var(--radius-full)', background: 'var(--sp-sage)', color: '#fff', fontSize: '0.72rem', fontWeight: 600 }}>
+                {c.type}
               </span>
               <div style={{ display: 'flex', gap: '0.25rem' }}>
                 <button onClick={() => startEdit(c)} className="btn btn-sm btn-outline-secondary" style={{ padding: '0.25rem 0.5rem' }}><Pencil size={12} /></button>
@@ -98,11 +96,9 @@ export const CouponManagement = () => {
               </div>
             </div>
             <div style={{ fontFamily: 'var(--font-display)', fontSize: '1.1rem', fontWeight: 700, color: 'var(--sp-sienna)', marginBottom: '0.25rem' }}>{c.code}</div>
-            <p style={{ fontSize: '0.82rem', color: 'var(--sp-text-muted)', margin: '0 0 0.5rem' }}>{c.description}</p>
             <div style={{ fontSize: '0.82rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Type</span><span className="badge bg-secondary">{c.discountType}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Value</span><span style={{ fontWeight: 600 }}>{c.discountType === 'PERCENTAGE' ? `${c.discountValue}%` : `₹${c.discountValue}`}</span></div>
-              {c.minOrderValue && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Min Order</span><span>₹{c.minOrderValue}</span></div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Discount</span><span style={{ fontWeight: 600 }}>{c.type === 'PERCENTAGE' ? `${c.discount}%` : `₹${c.discount}`}</span></div>
+              {c.minOrderAmount && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Min Order</span><span>₹{c.minOrderAmount}</span></div>}
               {c.expiryDate && <div style={{ display: 'flex', justifyContent: 'space-between' }}><span>Expires</span><span>{formatDate(c.expiryDate)}</span></div>}
             </div>
           </div>
